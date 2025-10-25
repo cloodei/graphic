@@ -1,47 +1,482 @@
 import * as THREE from 'three'
 
-const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x0a0a1a)
+type RoofStyle = 'flat' | 'angled' | 'helipad'
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-camera.position.set(8, 5, 9)
-camera.lookAt(0, 1, 0)
+interface BuildingConfig {
+  x: number
+  z: number
+  width: number
+  depth: number
+  height: number
+  floors: number
+  roofStyle: RoofStyle
+}
+
+interface BuildingTextures {
+  facades: THREE.Texture[]
+  accents: THREE.Texture[]
+  roofs: THREE.Texture[]
+}
+
+const createAsphaltTexture = () => {
+  const canvas = document.createElement('canvas')
+  const size = 256
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+
+  ctx.fillStyle = '#0b0d11'
+  ctx.fillRect(0, 0, size, size)
+
+  for (let i = 0; i < 2200; i += 1) {
+    const value = 20 + Math.random() * 40
+    ctx.fillStyle = `rgba(${value}, ${value + 5}, ${value + 10}, ${0.25 + Math.random() * 0.2})`
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const r = Math.random() * 1.6
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  return canvas
+}
+
+const createRoadTexture = () => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')!
+
+  ctx.fillStyle = '#111216'
+  ctx.fillRect(0, 0, 256, 256)
+
+  ctx.strokeStyle = '#272a30'
+  ctx.lineWidth = 2
+  for (let i = 0; i < 60; i += 1) {
+    const offset = Math.random() * 256
+    ctx.beginPath()
+    ctx.moveTo(0, offset)
+    ctx.lineTo(256, offset - 16)
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = '#f2f2f2'
+  ctx.lineWidth = 6
+  ctx.setLineDash([32, 32])
+  ctx.lineDashOffset = 0
+  ctx.beginPath()
+  ctx.moveTo(128, 0)
+  ctx.lineTo(128, 256)
+  ctx.stroke()
+
+  ctx.setLineDash([])
+
+  return canvas
+}
+
+const createSidewalkTexture = () => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')!
+
+  ctx.fillStyle = '#2a2f39'
+  ctx.fillRect(0, 0, 128, 128)
+
+  ctx.strokeStyle = '#3b4452'
+  ctx.lineWidth = 4
+  for (let i = 0; i <= 128; i += 32) {
+    ctx.beginPath()
+    ctx.moveTo(i, 0)
+    ctx.lineTo(i, 128)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(0, i)
+    ctx.lineTo(128, i)
+    ctx.stroke()
+  }
+
+  return canvas
+}
+
+const createFacadeTexture = (base: string, windows: string) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')!
+
+  const baseColor = new THREE.Color(base)
+  const topColor = baseColor.clone().offsetHSL(0, 0, 0.08)
+  const bottomColor = baseColor.clone().offsetHSL(0, 0, -0.08)
+  const gradient = ctx.createLinearGradient(0, 0, 0, 256)
+  gradient.addColorStop(0, `#${topColor.getHexString()}`)
+  gradient.addColorStop(1, `#${bottomColor.getHexString()}`)
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, 256, 256)
+
+  const columns = 6
+  const rows = 8
+  const paddingX = 16
+  const paddingY = 18
+  const cellW = (256 - paddingX * 2) / columns
+  const cellH = (256 - paddingY * 2) / rows
+
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      const flicker = 0.55 + Math.random() * 0.35
+      ctx.fillStyle = windows
+      ctx.globalAlpha = flicker
+      const offsetX = paddingX + x * cellW + cellW * 0.12
+      const offsetY = paddingY + y * cellH + cellH * 0.14
+      ctx.fillRect(offsetX, offsetY, cellW * 0.76, cellH * 0.68)
+      ctx.globalAlpha = 1
+    }
+  }
+
+  ctx.fillStyle = '#1a1d24'
+  ctx.fillRect(0, 0, 256, 10)
+  ctx.fillRect(0, 246, 256, 10)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.anisotropy = 4
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  return texture
+}
+
+const createRoofTexture = () => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')!
+
+  ctx.fillStyle = '#1e222b'
+  ctx.fillRect(0, 0, 256, 256)
+
+  ctx.strokeStyle = '#2b303b'
+  ctx.lineWidth = 4
+  for (let i = 0; i < 256; i += 32) {
+    ctx.beginPath()
+    ctx.moveTo(0, i)
+    ctx.lineTo(256, i)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(i, 0)
+    ctx.lineTo(i, 256)
+    ctx.stroke()
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  return texture
+}
+
+const createBuildingTextures = () => {
+  const facades = [
+    createFacadeTexture('#1c2940', '#b7d4ff'),
+    createFacadeTexture('#242f45', '#ffd169'),
+    createFacadeTexture('#1b2d3f', '#82a6ff'),
+    createFacadeTexture('#2a3346', '#ffefba')
+  ]
+
+  const accents = [createFacadeTexture('#2d3a4f', '#c9d6ff'), createFacadeTexture('#253347', '#ffcfa3')]
+  const roofs = [createRoofTexture()]
+
+  return { facades, accents, roofs }
+}
+
+const createBuildingSection = (width: number, height: number, depth: number, textures: BuildingTextures) => {
+  const geometry = new THREE.BoxGeometry(width, height, depth)
+  const facadeTexture = textures.facades[Math.floor(Math.random() * textures.facades.length)].clone()
+  const sideTexture = textures.accents[Math.floor(Math.random() * textures.accents.length)].clone()
+  const roofTexture = textures.roofs[Math.floor(Math.random() * textures.roofs.length)].clone()
+
+  facadeTexture.wrapS = THREE.RepeatWrapping
+  facadeTexture.wrapT = THREE.RepeatWrapping
+  sideTexture.wrapS = THREE.RepeatWrapping
+  sideTexture.wrapT = THREE.RepeatWrapping
+  roofTexture.wrapS = THREE.RepeatWrapping
+  roofTexture.wrapT = THREE.RepeatWrapping
+
+  const repeatX = Math.max(1, Math.round(width / 4))
+  const repeatY = Math.max(1, Math.round(height / 3))
+  facadeTexture.repeat.set(repeatX, repeatY)
+  sideTexture.repeat.set(Math.max(1, Math.round(depth / 4)), repeatY)
+  roofTexture.repeat.set(Math.max(1, Math.round(width / 6)), Math.max(1, Math.round(depth / 6)))
+  facadeTexture.needsUpdate = true
+  sideTexture.needsUpdate = true
+  roofTexture.needsUpdate = true
+
+  const facadeMaterial = new THREE.MeshStandardMaterial({ map: facadeTexture, roughness: 0.85, metalness: 0.18 })
+  const sideMaterial = new THREE.MeshStandardMaterial({ map: sideTexture, roughness: 0.9, metalness: 0.15 })
+  const roofMaterial = new THREE.MeshStandardMaterial({ map: roofTexture, roughness: 0.92, metalness: 0.12 })
+
+  const materials = [facadeMaterial, facadeMaterial, sideMaterial, sideMaterial, roofMaterial, roofMaterial]
+  return new THREE.Mesh(geometry, materials)
+}
+
+const createRoof = (width: number, depth: number, style: RoofStyle) => {
+  switch (style) {
+    case 'angled': {
+      const roofGeometry = new THREE.ConeGeometry(Math.max(width, depth) * 0.6, Math.max(width, depth) * 0.45, 4)
+      const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x2a303d, metalness: 0.2, roughness: 0.7 })
+      const roof = new THREE.Mesh(roofGeometry, roofMaterial)
+      roof.rotation.y = Math.PI / 4
+      return roof
+    }
+    case 'helipad': {
+      const platform = new THREE.Mesh(
+        new THREE.CylinderGeometry(Math.max(width, depth) * 0.4, Math.max(width, depth) * 0.4, 0.6, 32),
+        new THREE.MeshStandardMaterial({ color: 0x20252f, roughness: 0.8, metalness: 0.2 })
+      )
+      const helipad = new THREE.Mesh(
+        new THREE.RingGeometry(Math.max(width, depth) * 0.15, Math.max(width, depth) * 0.35, 32),
+        new THREE.MeshBasicMaterial({ color: 0xfff276, side: THREE.DoubleSide })
+      )
+      helipad.rotation.x = -Math.PI / 2
+      helipad.position.y = 0.35
+      platform.add(helipad)
+      return platform
+    }
+    default: {
+      const roof = new THREE.Mesh(
+        new THREE.BoxGeometry(width * 1.02, 0.6, depth * 1.02),
+        new THREE.MeshStandardMaterial({ color: 0x171c26, roughness: 0.88, metalness: 0.1 })
+      )
+      return roof
+    }
+  }
+}
+
+const createCityLayout = () => {
+  const configs: BuildingConfig[] = []
+  const gridRadius = 5
+  const blockSpacing = 40
+  const innerSafeRadius = 1
+
+  for (let gx = -gridRadius; gx <= gridRadius; gx++) {
+    for (let gz = -gridRadius; gz <= gridRadius; gz++) {
+      if (Math.abs(gx) <= innerSafeRadius && Math.abs(gz) <= innerSafeRadius) continue
+
+      const anchorX = gx * blockSpacing
+      const anchorZ = gz * blockSpacing
+      const buildingCount = THREE.MathUtils.randInt(2, 4)
+
+      for (let i = 0; i < buildingCount; i++) {
+        const width = THREE.MathUtils.randFloat(10, 22)
+        const depth = THREE.MathUtils.randFloat(10, 22)
+        const floors = THREE.MathUtils.randInt(4, 12)
+        const height = floors * THREE.MathUtils.randFloat(3, 3.8)
+        const offsetX = THREE.MathUtils.randFloatSpread(blockSpacing * 0.6)
+        const offsetZ = THREE.MathUtils.randFloatSpread(blockSpacing * 0.6)
+
+        const roofRoll: RoofStyle[] = ['flat', 'angled', 'helipad']
+        const roofStyle = roofRoll[Math.floor(Math.random() * roofRoll.length)]
+
+        configs.push({
+          x: anchorX + offsetX,
+          z: anchorZ + offsetZ,
+          width,
+          depth,
+          floors,
+          height,
+          roofStyle
+        })
+      }
+    }
+  }
+
+  return configs
+}
+
+const createRoadNetwork = () => {
+  const meshes: THREE.Mesh[] = []
+  const roadTexture = new THREE.CanvasTexture(createRoadTexture())
+  roadTexture.wrapS = THREE.RepeatWrapping
+  roadTexture.wrapT = THREE.RepeatWrapping
+  roadTexture.anisotropy = 4
+
+  const roadWidth = 14
+  const mainLength = 520
+  const gridRadius = 5
+  const spacing = 40
+
+  for (let i = -gridRadius; i <= gridRadius; i++) {
+    const eastWestTexture = roadTexture.clone()
+    eastWestTexture.wrapS = THREE.RepeatWrapping
+    eastWestTexture.wrapT = THREE.RepeatWrapping
+    eastWestTexture.needsUpdate = true
+    const eastWest = new THREE.Mesh(
+      new THREE.PlaneGeometry(mainLength, roadWidth),
+      new THREE.MeshStandardMaterial({ map: eastWestTexture, roughness: 0.9, metalness: 0.05 })
+    )
+    eastWest.rotation.x = -Math.PI / 2
+    eastWest.position.z = i * spacing
+    eastWest.position.y = 0.02
+    eastWest.material.map!.repeat.set(mainLength / 80, roadWidth / 10)
+    meshes.push(eastWest)
+
+    const northSouthTexture = roadTexture.clone()
+    northSouthTexture.wrapS = THREE.RepeatWrapping
+    northSouthTexture.wrapT = THREE.RepeatWrapping
+    northSouthTexture.needsUpdate = true
+    const northSouth = new THREE.Mesh(
+      new THREE.PlaneGeometry(roadWidth, mainLength),
+      new THREE.MeshStandardMaterial({ map: northSouthTexture, roughness: 0.9, metalness: 0.05 })
+    )
+    northSouth.rotation.x = -Math.PI / 2
+    northSouth.position.x = i * spacing
+    northSouth.position.y = 0.02
+    northSouth.material.map!.repeat.set(roadWidth / 10, mainLength / 80)
+    meshes.push(northSouth)
+  }
+
+  return meshes
+}
+
+const createSidewalkRings = () => {
+  const meshes: THREE.Mesh[] = []
+  const sidewalkTexture = new THREE.CanvasTexture(createSidewalkTexture())
+  sidewalkTexture.wrapS = THREE.RepeatWrapping
+  sidewalkTexture.wrapT = THREE.RepeatWrapping
+  sidewalkTexture.anisotropy = 4
+
+  const spacing = 40
+  const ringWidth = 6
+  const gridRadius = 5
+  const mainLength = 520
+
+  for (let i = -gridRadius; i <= gridRadius; i++) {
+    const horizontalTexture = sidewalkTexture.clone()
+    horizontalTexture.wrapS = THREE.RepeatWrapping
+    horizontalTexture.wrapT = THREE.RepeatWrapping
+    horizontalTexture.needsUpdate = true
+    const horizontal = new THREE.Mesh(
+      new THREE.PlaneGeometry(mainLength, ringWidth),
+      new THREE.MeshStandardMaterial({ map: horizontalTexture, roughness: 0.95, metalness: 0.05 })
+    )
+    horizontal.rotation.x = -Math.PI / 2
+    horizontal.position.z = i * spacing + ringWidth * 0.8
+    horizontal.position.y = 0.018
+    horizontal.material.map!.repeat.set(mainLength / 60, ringWidth / 4)
+    meshes.push(horizontal)
+
+    const verticalTexture = sidewalkTexture.clone()
+    verticalTexture.wrapS = THREE.RepeatWrapping
+    verticalTexture.wrapT = THREE.RepeatWrapping
+    verticalTexture.needsUpdate = true
+    const vertical = new THREE.Mesh(
+      new THREE.PlaneGeometry(ringWidth, mainLength),
+      new THREE.MeshStandardMaterial({ map: verticalTexture, roughness: 0.95, metalness: 0.05 })
+    )
+    vertical.rotation.x = -Math.PI / 2
+    vertical.position.x = i * spacing + ringWidth * 0.8
+    vertical.position.y = 0.018
+    vertical.material.map!.repeat.set(ringWidth / 4, mainLength / 60)
+    meshes.push(vertical)
+  }
+
+  return meshes
+}
+
+const scene = new THREE.Scene()
+scene.background = new THREE.Color(0x000000)
+scene.fog = new THREE.FogExp2(0x000000, 0.022)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
+renderer.setPixelRatio(window.devicePixelRatio)
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
+renderer.outputColorSpace = THREE.SRGBColorSpace
 document.body.appendChild(renderer.domElement)
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x1c2233, 0.6)
-scene.add(hemiLight)
+const cameraPivot = new THREE.Object3D()
+cameraPivot.position.set(0, 1, 0)
+scene.add(cameraPivot)
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 0.9)
-keyLight.position.set(5, 8, 6)
-keyLight.castShadow = true
-keyLight.shadow.mapSize.set(2048, 2048)
-scene.add(keyLight)
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150)
+cameraPivot.add(camera)
 
-const rimLight = new THREE.SpotLight(0x88ccff, 0.5, 40, Math.PI / 6, 0.3)
-rimLight.position.set(-10, 6, -8)
-rimLight.target.position.set(0, 1, 0)
-scene.add(rimLight)
-scene.add(rimLight.target)
+const spherical = new THREE.Spherical(18, Math.PI / 3, Math.PI / 4)
+const updateCameraPosition = () => {
+  const sinPhiRadius = Math.sin(spherical.phi) * spherical.radius
+  camera.position.set(
+    sinPhiRadius * Math.sin(spherical.theta),
+    Math.cos(spherical.phi) * spherical.radius,
+    sinPhiRadius * Math.cos(spherical.theta)
+  )
+  camera.lookAt(cameraPivot.position)
+  camera.updateProjectionMatrix()
+}
+updateCameraPosition()
+
+let isDragging = false
+const lastPointer = new THREE.Vector2()
+
+window.addEventListener('mousedown', (event) => {
+  isDragging = true
+  lastPointer.set(event.clientX, event.clientY)
+})
+window.addEventListener('mouseup', () => isDragging = false)
+window.addEventListener('mouseleave', () => isDragging = false)
+window.addEventListener('mousemove', (event) => {
+  if (!isDragging)
+    return
+
+  const deltaX = event.clientX - lastPointer.x
+  const deltaY = event.clientY - lastPointer.y
+  lastPointer.set(event.clientX, event.clientY)
+  spherical.theta -= deltaX * 0.005
+  spherical.phi = THREE.MathUtils.clamp(spherical.phi - deltaY * 0.005, 0.2, Math.PI / 2 - 0.1)
+  updateCameraPosition()
+})
+window.addEventListener('wheel', (event) => {
+  spherical.radius = THREE.MathUtils.clamp(spherical.radius + event.deltaY * 0.01, 8, 40)
+  updateCameraPosition()
+})
+
+const groundTexture = new THREE.CanvasTexture(createAsphaltTexture())
+groundTexture.wrapS = THREE.RepeatWrapping
+groundTexture.wrapT = THREE.RepeatWrapping
+groundTexture.repeat.set(70, 70)
 
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: 0x111824, roughness: 0.9, metalness: 0 })
+  new THREE.PlaneGeometry(500, 500, 1, 1),
+  new THREE.MeshStandardMaterial({ map: groundTexture, roughness: 0.95, metalness: 0 })
 )
 ground.rotation.x = -Math.PI / 2
-ground.position.y = 0
 ground.receiveShadow = true
 scene.add(ground)
 
 const carGroup = new THREE.Group()
 scene.add(carGroup)
 
-const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5bff, metalness: 0.5, roughness: 0.25 })
-const trimMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.3, roughness: 0.7 })
-const glassMaterial = new THREE.MeshPhysicalMaterial({ color: 0x8fbaff, transmission: 0.7, roughness: 0.05, thickness: 0.2 })
+const bodyMaterial = new THREE.MeshStandardMaterial({
+  color: 0x2d5bff,
+  metalness: 0.5,
+  roughness: 0.25,
+  emissive: new THREE.Color(0x11244f),
+  emissiveIntensity: 0.6
+})
+const trimMaterial = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  metalness: 0.3,
+  roughness: 0.7,
+  emissive: new THREE.Color(0x080808),
+  emissiveIntensity: 0.55
+})
+const glassMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0x8fbaff,
+  transmission: 0.6,
+  roughness: 0.05,
+  thickness: 0.2,
+  emissive: new THREE.Color(0x335d82),
+  emissiveIntensity: 0.4
+})
 
 const chassis = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.6, 2.4), trimMaterial)
 chassis.castShadow = true
@@ -88,29 +523,36 @@ carGroup.add(rearBumper)
 
 const grill = new THREE.Mesh(
   new THREE.BoxGeometry(0.2, 0.4, 1.4),
-  new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.2 })
+  new THREE.MeshStandardMaterial({ color: 0x202020, metalness: 0.8, roughness: 0.2 })
 )
 grill.position.set(2.65, 1.1, 0)
 carGroup.add(grill)
 
-const headlightMaterial = new THREE.MeshStandardMaterial({ color: 0xfff7b2, emissive: 0xffd966, emissiveIntensity: 0.9 })
-const taillightMaterial = new THREE.MeshStandardMaterial({ color: 0xff3a3a, emissive: 0xff1c1c, emissiveIntensity: 0.7 })
-
-const headlightLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 24), headlightMaterial)
+const headlightGeometry = new THREE.CylinderGeometry(0.18, 0.18, 0.24, 24)
+const headlightMaterial = new THREE.MeshStandardMaterial({
+  color: 0xfbf5d5,
+  emissive: 0xfff2c4,
+  emissiveIntensity: 0.85,
+  roughness: 0.22,
+  metalness: 0.18
+})
+const headlightLeft = new THREE.Mesh(headlightGeometry, headlightMaterial.clone())
 headlightLeft.rotation.z = Math.PI / 2
-headlightLeft.position.set(2.85, 1, 0.55)
+headlightLeft.position.set(2.7, 1, 0.6)
 carGroup.add(headlightLeft)
 
-const headlightRight = headlightLeft.clone()
-headlightRight.position.z = -0.55
+const headlightRight = new THREE.Mesh(headlightGeometry, headlightMaterial.clone())
+headlightRight.rotation.z = Math.PI / 2
+headlightRight.position.set(2.7, 1, -0.6)
 carGroup.add(headlightRight)
 
+const taillightMaterial = new THREE.MeshStandardMaterial({ color: 0xff3a3a, emissive: 0xff1c1c, emissiveIntensity: 0.6, roughness: 0.8 })
 const taillightLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.5), taillightMaterial)
 taillightLeft.position.set(-2.85, 1.05, 0.55)
 carGroup.add(taillightLeft)
 
-const taillightRight = taillightLeft.clone()
-taillightRight.position.z = -0.55
+const taillightRight = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.5), taillightMaterial.clone())
+taillightRight.position.set(-2.85, 1.05, -0.55)
 carGroup.add(taillightRight)
 
 const wheelGeometry = new THREE.CylinderGeometry(0.55, 0.55, 0.5, 32)
@@ -142,18 +584,260 @@ createWheel(1.6, -1)
 createWheel(-1.6, 1)
 createWheel(-1.6, -1)
 
-carGroup.rotation.y = Math.PI / 6
+const createHeadlightSpot = (offsetZ: number) => {
+  const light = new THREE.SpotLight(0xfff8d4, 0, 170, Math.PI / 6.5, 0.15, 1)
+  light.position.set(2.6, 1.05, offsetZ)
+  light.target.position.set(40, 0.3, offsetZ * 0.8)
+  light.castShadow = true
+  light.shadow.mapSize.set(1024, 1024)
+  light.shadow.camera.near = 0.5
+  light.shadow.camera.far = 160
+  light.shadow.bias = -0.0001
+
+  carGroup.add(light)
+  carGroup.add(light.target)
+
+  return light
+}
+
+const headlightSpots = [createHeadlightSpot(0.6), createHeadlightSpot(-0.6)]
+const headlightMeshes = [headlightLeft, headlightRight]
+let headlightsOn = true
+
+const setHeadlights = (on: boolean) => {
+  headlightsOn = on
+  const intensity = on ? 32 : 0
+  headlightSpots.forEach(light => {
+    light.intensity = intensity
+  })
+  headlightMeshes.forEach(mesh => {
+    const material = mesh.material as THREE.MeshStandardMaterial
+    material.emissiveIntensity = on ? 3.2 : 0.2
+  })
+}
+
+setHeadlights(headlightsOn)
+
+const cabinGlow = new THREE.PointLight(0x4d6eff, 1.3, 6, 1.8)
+cabinGlow.position.set(-0.4, 1.8, 0)
+carGroup.add(cabinGlow)
+
+const carDetailLight = new THREE.SpotLight(0x6a8cff, 0.85, 8, Math.PI / 3, 0.65, 1.4)
+carDetailLight.position.set(0, 2.4, 0)
+carDetailLight.target.position.set(0, 1, 0)
+carDetailLight.castShadow = false
+carGroup.add(carDetailLight)
+carGroup.add(carDetailLight.target)
+
+const globalAmbient = new THREE.AmbientLight(0x6f7f9f, 0)
+const globalDirectional = new THREE.DirectionalLight(0xbfd2ff, 0)
+globalDirectional.position.set(30, 60, 10)
+globalDirectional.castShadow = false
+scene.add(globalAmbient)
+scene.add(globalDirectional)
+
+let globalLightOn = false
+
+const setGlobalLight = (on: boolean) => {
+  globalLightOn = on
+  const targetAmbient = on ? 0.6 : 0
+  const targetDirectional = on ? 1.1 : 0
+  globalAmbient.intensity = targetAmbient
+  globalDirectional.intensity = targetDirectional
+}
+
+setGlobalLight(globalLightOn)
+
+const buildingBoxes: THREE.Box3[] = []
+const buildingTextures = createBuildingTextures()
+
+const addBuilding = (config: BuildingConfig) => {
+  const { x, z, width, depth, height, floors, roofStyle } = config
+  const buildingGroup = new THREE.Group()
+  buildingGroup.position.set(x, 0, z)
+
+  const floorHeight = height / floors
+  for (let i = 0; i < floors; i++) {
+    const y = floorHeight * i
+    const facadeMesh = createBuildingSection(width, floorHeight, depth, buildingTextures)
+    facadeMesh.position.set(0, y + floorHeight / 2, 0)
+    buildingGroup.add(facadeMesh)
+  }
+
+  const roof = createRoof(width, depth, roofStyle)
+  roof.position.y = height
+  buildingGroup.add(roof)
+
+  buildingGroup.traverse(obj => {
+    obj.castShadow = true
+    obj.receiveShadow = true
+  })
+
+  scene.add(buildingGroup)
+  buildingBoxes.push(new THREE.Box3().setFromObject(buildingGroup))
+}
+
+const districtConfigs: BuildingConfig[] = createCityLayout()
+districtConfigs.forEach(addBuilding)
+
+const roadNetwork = createRoadNetwork()
+roadNetwork.forEach(mesh => scene.add(mesh))
+
+const sidewalks = createSidewalkRings()
+sidewalks.forEach(mesh => scene.add(mesh))
+
+const controlsState = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false
+}
+
+const handleMovementKey = (key: string, value: boolean) => {
+  switch (key) {
+    case 'w':
+    case 'arrowup':
+      controlsState.forward = value
+      break;
+    case 's':
+    case 'arrowdown':
+      controlsState.backward = value
+      break;
+    case 'a':
+    case 'arrowleft':
+      controlsState.left = value
+      break;
+    case 'd':
+    case 'arrowright':
+      controlsState.right = value
+      break;
+  }
+}
+
+window.addEventListener('keydown', (event: KeyboardEvent) => {
+  const key = event.key.toLowerCase()
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key))
+    event.preventDefault()
+
+  if (key === 'h') {
+    setHeadlights(!headlightsOn)
+    return
+  }
+  if (key === 'c') {
+    cameraPivot.position.copy(carGroup.position)
+    updateCameraPosition()
+    return
+  }
+  if (key === 'g') {
+    setGlobalLight(!globalLightOn)
+    return
+  }
+  handleMovementKey(key, true)
+})
+
+window.addEventListener('keyup', (event: KeyboardEvent) => {
+  handleMovementKey(event.key.toLowerCase(), false)
+})
+
+const moveParams = {
+  acceleration: 22,
+  deceleration: 26,
+  maxForwardSpeed: 14,
+  maxReverseSpeed: 5,
+  turnSpeed: Math.PI
+}
+
+const driveBounds = 200
+const forwardVector = new THREE.Vector3()
+const moveDelta = new THREE.Vector3()
+const previousPosition = new THREE.Vector3()
+const carBox = new THREE.Box3()
+
+let moveSpeed = 0
+
+const applyDrag = (delta: number) => {
+  if (moveSpeed > 0)
+    moveSpeed = Math.max(0, moveSpeed - moveParams.deceleration * delta)
+  else if (moveSpeed < 0)
+    moveSpeed = Math.min(0, moveSpeed + moveParams.deceleration * delta)
+}
+
+const updateMovement = (delta: number) => {
+  if (controlsState.forward)
+    moveSpeed += moveParams.acceleration * delta
+
+  if (controlsState.backward)
+    moveSpeed -= moveParams.acceleration * delta
+
+  if (!controlsState.forward && !controlsState.backward)
+    applyDrag(delta)
+
+  moveSpeed = THREE.MathUtils.clamp(
+    moveSpeed,
+    -moveParams.maxReverseSpeed,
+    moveParams.maxForwardSpeed
+  )
+
+  if (Math.abs(moveSpeed) < 0.01)
+    moveSpeed = 0
+
+  const turnDirection = moveSpeed !== 0 ? Math.sign(moveSpeed) : 1
+  if (controlsState.left)
+    carGroup.rotation.y += moveParams.turnSpeed * delta * turnDirection
+
+  if (controlsState.right)
+    carGroup.rotation.y -= moveParams.turnSpeed * delta * turnDirection
+
+  forwardVector.set(1, 0, 0).applyQuaternion(carGroup.quaternion)
+  moveDelta.copy(forwardVector).multiplyScalar(moveSpeed * delta)
+
+  if (moveDelta.lengthSq() === 0)
+    return
+
+  previousPosition.copy(carGroup.position)
+  carGroup.position.add(moveDelta)
+  carGroup.position.y = 0
+  carGroup.updateMatrixWorld(true)
+
+  carBox.setFromObject(carGroup)
+
+  let blocked = false
+  if (
+    carGroup.position.x > driveBounds ||
+    carGroup.position.x < -driveBounds ||
+    carGroup.position.z > driveBounds ||
+    carGroup.position.z < -driveBounds
+  ) {
+    blocked = true
+  } else {
+    for (const box of buildingBoxes) {
+      if (carBox.intersectsBox(box)) {
+        blocked = true
+        break
+      }
+    }
+  }
+
+  if (blocked) {
+    carGroup.position.copy(previousPosition)
+    carGroup.updateMatrixWorld(true)
+    moveSpeed = 0
+  }
+}
+
+const clock = new THREE.Clock()
 
 const animate = () => {
-  requestAnimationFrame(animate)
-  carGroup.rotation.y += 0.0025
+  const delta = clock.getDelta()
+  updateMovement(delta)
   renderer.render(scene, camera)
 }
 
-animate()
+renderer.setAnimationLoop(animate)
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
+  updateCameraPosition()
 })
