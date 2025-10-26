@@ -1,256 +1,8 @@
 import * as THREE from 'three'
-
-type RoofStyle = 'flat' | 'angled' | 'helipad'
-
-interface BuildingConfig {
-  x: number
-  z: number
-  width: number
-  depth: number
-  height: number
-  floors: number
-  roofStyle: RoofStyle
-}
-
-interface BuildingTextures {
-  facades: THREE.Texture[]
-  accents: THREE.Texture[]
-  roofs: THREE.Texture[]
-}
-
-const createAsphaltTexture = () => {
-  const canvas = document.createElement('canvas')
-  const size = 256
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-
-  ctx.fillStyle = '#0b0d11'
-  ctx.fillRect(0, 0, size, size)
-
-  for (let i = 0; i < 2200; i++) {
-    const value = 20 + Math.random() * 40
-    ctx.fillStyle = `rgba(${value}, ${value + 5}, ${value + 10}, ${0.25 + Math.random() * 0.2})`
-    const x = Math.random() * size
-    const y = Math.random() * size
-    const r = Math.random() * 1.6
-    ctx.beginPath()
-    ctx.arc(x, y, r, 0, Math.PI * 2)
-    ctx.fill()
-  }
-
-  return canvas
-}
-
-const createRoadTexture = () => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')!
-
-  ctx.fillStyle = '#111216'
-  ctx.fillRect(0, 0, 256, 256)
-
-  ctx.strokeStyle = '#272a30'
-  ctx.lineWidth = 2
-  for (let i = 0; i < 60; i++) {
-    const offset = Math.random() * 256
-    ctx.beginPath()
-    ctx.moveTo(0, offset)
-    ctx.lineTo(256, offset - 16)
-    ctx.stroke()
-  }
-
-  ctx.strokeStyle = '#f2f2f2'
-  ctx.lineWidth = 6
-  ctx.setLineDash([32, 32])
-  ctx.lineDashOffset = 0
-  ctx.beginPath()
-  ctx.moveTo(128, 0)
-  ctx.lineTo(128, 256)
-  ctx.stroke()
-
-  ctx.setLineDash([])
-
-  return canvas
-}
-
-const createSidewalkTexture = () => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
-  const ctx = canvas.getContext('2d')!
-
-  ctx.fillStyle = '#2a2f39'
-  ctx.fillRect(0, 0, 128, 128)
-
-  ctx.strokeStyle = '#3b4452'
-  ctx.lineWidth = 4
-  for (let i = 0; i <= 128; i += 32) {
-    ctx.beginPath()
-    ctx.moveTo(i, 0)
-    ctx.lineTo(i, 128)
-    ctx.stroke()
-
-    ctx.beginPath()
-    ctx.moveTo(0, i)
-    ctx.lineTo(128, i)
-    ctx.stroke()
-  }
-
-  return canvas
-}
-
-const createFacadeTexture = (base: string, windows: string) => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')!
-
-  const baseColor = new THREE.Color(base)
-  const topColor = baseColor.clone().offsetHSL(0, 0, 0.08)
-  const bottomColor = baseColor.clone().offsetHSL(0, 0, -0.08)
-  const gradient = ctx.createLinearGradient(0, 0, 0, 256)
-  gradient.addColorStop(0, `#${topColor.getHexString()}`)
-  gradient.addColorStop(1, `#${bottomColor.getHexString()}`)
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 256, 256)
-
-  const columns = 6
-  const rows = 8
-  const paddingX = 16
-  const paddingY = 18
-  const cellW = (256 - paddingX * 2) / columns
-  const cellH = (256 - paddingY * 2) / rows
-
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < columns; x++) {
-      const flicker = 0.55 + Math.random() * 0.35
-      ctx.fillStyle = windows
-      ctx.globalAlpha = flicker
-      const offsetX = paddingX + x * cellW + cellW * 0.12
-      const offsetY = paddingY + y * cellH + cellH * 0.14
-      ctx.fillRect(offsetX, offsetY, cellW * 0.76, cellH * 0.68)
-      ctx.globalAlpha = 1
-    }
-  }
-
-  ctx.fillStyle = '#1a1d24'
-  ctx.fillRect(0, 0, 256, 10)
-  ctx.fillRect(0, 246, 256, 10)
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.anisotropy = 4
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
-  return texture
-}
-
-const createRoofTexture = () => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')!
-
-  ctx.fillStyle = '#1e222b'
-  ctx.fillRect(0, 0, 256, 256)
-
-  ctx.strokeStyle = '#2b303b'
-  ctx.lineWidth = 4
-  for (let i = 0; i < 256; i += 32) {
-    ctx.beginPath()
-    ctx.moveTo(0, i)
-    ctx.lineTo(256, i)
-    ctx.stroke()
-
-    ctx.beginPath()
-    ctx.moveTo(i, 0)
-    ctx.lineTo(i, 256)
-    ctx.stroke()
-  }
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
-  return texture
-}
-
-const createBuildingTextures = () => {
-  const facades = [
-    createFacadeTexture('#1c2940', '#b7d4ff'),
-    createFacadeTexture('#242f45', '#ffd169'),
-    createFacadeTexture('#1b2d3f', '#82a6ff'),
-    createFacadeTexture('#2a3346', '#ffefba')
-  ]
-
-  const accents = [createFacadeTexture('#2d3a4f', '#c9d6ff'), createFacadeTexture('#253347', '#ffcfa3')]
-  const roofs = [createRoofTexture()]
-
-  return { facades, accents, roofs }
-}
-
-const createBuildingSection = (width: number, height: number, depth: number, textures: BuildingTextures) => {
-  const geometry = new THREE.BoxGeometry(width, height, depth)
-  const facadeTexture = textures.facades[Math.floor(Math.random() * textures.facades.length)].clone()
-  const sideTexture = textures.accents[Math.floor(Math.random() * textures.accents.length)].clone()
-  const roofTexture = textures.roofs[Math.floor(Math.random() * textures.roofs.length)].clone()
-
-  facadeTexture.wrapS = THREE.RepeatWrapping
-  facadeTexture.wrapT = THREE.RepeatWrapping
-  sideTexture.wrapS = THREE.RepeatWrapping
-  sideTexture.wrapT = THREE.RepeatWrapping
-  roofTexture.wrapS = THREE.RepeatWrapping
-  roofTexture.wrapT = THREE.RepeatWrapping
-
-  const repeatX = Math.max(1, Math.round(width / 4))
-  const repeatY = Math.max(1, Math.round(height / 3))
-  facadeTexture.repeat.set(repeatX, repeatY)
-  sideTexture.repeat.set(Math.max(1, Math.round(depth / 4)), repeatY)
-  roofTexture.repeat.set(Math.max(1, Math.round(width / 6)), Math.max(1, Math.round(depth / 6)))
-  facadeTexture.needsUpdate = true
-  sideTexture.needsUpdate = true
-  roofTexture.needsUpdate = true
-
-  const facadeMaterial = new THREE.MeshStandardMaterial({ map: facadeTexture, roughness: 0.85, metalness: 0.18 })
-  const sideMaterial = new THREE.MeshStandardMaterial({ map: sideTexture, roughness: 0.9, metalness: 0.15 })
-  const roofMaterial = new THREE.MeshStandardMaterial({ map: roofTexture, roughness: 0.92, metalness: 0.12 })
-
-  const materials = [facadeMaterial, facadeMaterial, sideMaterial, sideMaterial, roofMaterial, roofMaterial]
-  return new THREE.Mesh(geometry, materials)
-}
-
-const createRoof = (width: number, depth: number, style: RoofStyle) => {
-  switch (style) {
-    case 'angled': {
-      const roofGeometry = new THREE.ConeGeometry(Math.max(width, depth) * 0.6, Math.max(width, depth) * 0.45, 4)
-      const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x2a303d, metalness: 0.2, roughness: 0.7 })
-      const roof = new THREE.Mesh(roofGeometry, roofMaterial)
-      roof.rotation.y = Math.PI / 4
-      return roof
-    }
-    case 'helipad': {
-      const platform = new THREE.Mesh(
-        new THREE.CylinderGeometry(Math.max(width, depth) * 0.4, Math.max(width, depth) * 0.4, 0.6, 32),
-        new THREE.MeshStandardMaterial({ color: 0x20252f, roughness: 0.8, metalness: 0.2 })
-      )
-      const helipad = new THREE.Mesh(
-        new THREE.RingGeometry(Math.max(width, depth) * 0.15, Math.max(width, depth) * 0.35, 32),
-        new THREE.MeshBasicMaterial({ color: 0xfff276, side: THREE.DoubleSide })
-      )
-      helipad.rotation.x = -Math.PI / 2
-      helipad.position.y = 0.35
-      platform.add(helipad)
-      return platform
-    }
-    default: {
-      const roof = new THREE.Mesh(
-        new THREE.BoxGeometry(width * 1.02, 0.6, depth * 1.02),
-        new THREE.MeshStandardMaterial({ color: 0x171c26, roughness: 0.88, metalness: 0.1 })
-      )
-      return roof
-    }
-  }
-}
+import { createAsphaltTexture } from './scene/textures'
+import { createRoadNetwork, createSidewalkRings } from './scene/infrastructure'
+import { createBuildingTextures, buildBuildingGroup } from './scene/buildings'
+import type { BuildingConfig, RoofStyle } from './types'
 
 const createCityLayout = () => {
   const configs: BuildingConfig[] = []
@@ -293,96 +45,6 @@ const createCityLayout = () => {
   return configs
 }
 
-const createRoadNetwork = () => {
-  const meshes: THREE.Mesh[] = []
-  const roadTexture = new THREE.CanvasTexture(createRoadTexture())
-  roadTexture.wrapS = THREE.RepeatWrapping
-  roadTexture.wrapT = THREE.RepeatWrapping
-  roadTexture.anisotropy = 4
-
-  const roadWidth = 14
-  const mainLength = 520
-  const gridRadius = 5
-  const spacing = 40
-
-  for (let i = -gridRadius; i <= gridRadius; i++) {
-    const eastWestTexture = roadTexture.clone()
-    eastWestTexture.wrapS = THREE.RepeatWrapping
-    eastWestTexture.wrapT = THREE.RepeatWrapping
-    eastWestTexture.needsUpdate = true
-    const eastWest = new THREE.Mesh(
-      new THREE.PlaneGeometry(mainLength, roadWidth),
-      new THREE.MeshStandardMaterial({ map: eastWestTexture, roughness: 0.9, metalness: 0.05 })
-    )
-    eastWest.rotation.x = -Math.PI / 2
-    eastWest.position.z = i * spacing
-    eastWest.position.y = 0.02
-    eastWest.material.map!.repeat.set(mainLength / 80, roadWidth / 10)
-    meshes.push(eastWest)
-
-    const northSouthTexture = roadTexture.clone()
-    northSouthTexture.wrapS = THREE.RepeatWrapping
-    northSouthTexture.wrapT = THREE.RepeatWrapping
-    northSouthTexture.needsUpdate = true
-    const northSouth = new THREE.Mesh(
-      new THREE.PlaneGeometry(roadWidth, mainLength),
-      new THREE.MeshStandardMaterial({ map: northSouthTexture, roughness: 0.9, metalness: 0.05 })
-    )
-    northSouth.rotation.x = -Math.PI / 2
-    northSouth.position.x = i * spacing
-    northSouth.position.y = 0.02
-    northSouth.material.map!.repeat.set(roadWidth / 10, mainLength / 80)
-    meshes.push(northSouth)
-  }
-
-  return meshes
-}
-
-const createSidewalkRings = () => {
-  const meshes: THREE.Mesh[] = []
-  const sidewalkTexture = new THREE.CanvasTexture(createSidewalkTexture())
-  sidewalkTexture.wrapS = THREE.RepeatWrapping
-  sidewalkTexture.wrapT = THREE.RepeatWrapping
-  sidewalkTexture.anisotropy = 4
-
-  const spacing = 40
-  const ringWidth = 6
-  const gridRadius = 5
-  const mainLength = 520
-
-  for (let i = -gridRadius; i <= gridRadius; i++) {
-    const horizontalTexture = sidewalkTexture.clone()
-    horizontalTexture.wrapS = THREE.RepeatWrapping
-    horizontalTexture.wrapT = THREE.RepeatWrapping
-    horizontalTexture.needsUpdate = true
-    const horizontal = new THREE.Mesh(
-      new THREE.PlaneGeometry(mainLength, ringWidth),
-      new THREE.MeshStandardMaterial({ map: horizontalTexture, roughness: 0.95, metalness: 0.05 })
-    )
-    horizontal.rotation.x = -Math.PI / 2
-    horizontal.position.z = i * spacing + ringWidth * 0.8
-    horizontal.position.y = 0.018
-    horizontal.material.map!.repeat.set(mainLength / 60, ringWidth / 4)
-    meshes.push(horizontal)
-
-    const verticalTexture = sidewalkTexture.clone()
-    verticalTexture.wrapS = THREE.RepeatWrapping
-    verticalTexture.wrapT = THREE.RepeatWrapping
-    verticalTexture.needsUpdate = true
-    const vertical = new THREE.Mesh(
-      new THREE.PlaneGeometry(ringWidth, mainLength),
-      new THREE.MeshStandardMaterial({ map: verticalTexture, roughness: 0.95, metalness: 0.05 })
-    )
-    vertical.rotation.x = -Math.PI / 2
-    vertical.position.x = i * spacing + ringWidth * 0.8
-    vertical.position.y = 0.018
-    vertical.material.map!.repeat.set(ringWidth / 4, mainLength / 60)
-    meshes.push(vertical)
-  }
-
-  return meshes
-}
-
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0x000000)
 scene.fog = new THREE.FogExp2(0x000000, 0.022)
@@ -398,10 +60,10 @@ const cameraPivot = new THREE.Object3D()
 cameraPivot.position.set(0, 1, 0)
 scene.add(cameraPivot)
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150)
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 800)
 cameraPivot.add(camera)
 
-const spherical = new THREE.Spherical(18, Math.PI / 3, Math.PI / 4)
+const spherical = new THREE.Spherical(55, Math.PI / 3.4, Math.PI / 4)
 const updateCameraPosition = () => {
   const sinPhiRadius = Math.sin(spherical.phi) * spherical.radius
   camera.position.set(
@@ -416,6 +78,21 @@ updateCameraPosition()
 
 let isDragging = false
 const lastPointer = new THREE.Vector2()
+const cameraMoveState = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false,
+  up: false,
+  down: false,
+  boost: false
+}
+const cameraMoveVector = new THREE.Vector3()
+const cameraForwardVector = new THREE.Vector3()
+const cameraStrafeVector = new THREE.Vector3()
+const cameraWorldUp = new THREE.Vector3(0, 1, 0)
+const baseCameraMoveSpeed = 28
+const cameraBoostMultiplier = 2.2
 
 window.addEventListener('mousedown', (event) => {
   isDragging = true
@@ -435,7 +112,7 @@ window.addEventListener('mousemove', (event) => {
   updateCameraPosition()
 })
 window.addEventListener('wheel', (event) => {
-  spherical.radius = THREE.MathUtils.clamp(spherical.radius + event.deltaY * 0.01, 8, 40)
+  spherical.radius = THREE.MathUtils.clamp(spherical.radius + event.deltaY * 0.01, 15, 140)
   updateCameraPosition()
 })
 
@@ -652,28 +329,9 @@ const buildingBoxes: THREE.Box3[] = []
 const buildingTextures = createBuildingTextures()
 
 const addBuilding = (config: BuildingConfig) => {
-  const { x, z, width, depth, height, floors, roofStyle } = config
-  const buildingGroup = new THREE.Group()
-  buildingGroup.position.set(x, 0, z)
-
-  const floorHeight = height / floors
-  for (let i = 0; i < floors; i++) {
-    const y = floorHeight * i
-    const facadeMesh = createBuildingSection(width, floorHeight, depth, buildingTextures)
-    facadeMesh.position.set(0, y + floorHeight / 2, 0)
-    buildingGroup.add(facadeMesh)
-  }
-
-  const roof = createRoof(width, depth, roofStyle)
-  roof.position.y = height
-  buildingGroup.add(roof)
-
-  buildingGroup.traverse(obj => {
-    obj.castShadow = true
-    obj.receiveShadow = true
-  })
-
+  const buildingGroup = buildBuildingGroup(config, buildingTextures)
   scene.add(buildingGroup)
+  buildingGroup.updateMatrixWorld(true)
   buildingBoxes.push(new THREE.Box3().setFromObject(buildingGroup))
 }
 
@@ -691,6 +349,34 @@ const controlsState = {
   backward: false,
   left: false,
   right: false
+}
+
+const handleCameraMoveKey = (key: string, value: boolean) => {
+  switch (key) {
+    case 'i':
+      cameraMoveState.forward = value
+      return true
+    case 'k':
+      cameraMoveState.backward = value
+      return true
+    case 'j':
+      cameraMoveState.left = value
+      return true
+    case 'l':
+      cameraMoveState.right = value
+      return true
+    case 'u':
+      cameraMoveState.up = value
+      return true
+    case 'o':
+      cameraMoveState.down = value
+      return true
+    case 'shift':
+      cameraMoveState.boost = value
+      return true
+    default:
+      return false
+  }
 }
 
 const handleMovementKey = (key: string, value: boolean) => {
@@ -719,6 +405,9 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key))
     event.preventDefault()
 
+  if (handleCameraMoveKey(key, true))
+    return
+
   if (key === 'h') {
     setHeadlights(!headlightsOn)
     return
@@ -736,7 +425,11 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 })
 
 window.addEventListener('keyup', (event: KeyboardEvent) => {
-  handleMovementKey(event.key.toLowerCase(), false)
+  const key = event.key.toLowerCase()
+  if (handleCameraMoveKey(key, false))
+    return
+
+  handleMovementKey(key, false)
 })
 
 const moveParams = {
@@ -825,11 +518,65 @@ const updateMovement = (delta: number) => {
   }
 }
 
+const updateCameraMovement = (delta: number) => {
+  const {
+    forward,
+    backward,
+    left,
+    right,
+    up,
+    down,
+    boost
+  } = cameraMoveState
+
+  if (!forward && !backward && !left && !right && !up && !down)
+    return
+
+  cameraMoveVector.set(0, 0, 0)
+
+  camera.getWorldDirection(cameraForwardVector)
+  cameraForwardVector.y = 0
+  if (cameraForwardVector.lengthSq() > 1e-6)
+    cameraForwardVector.normalize()
+  else
+    cameraForwardVector.set(0, 0, -1)
+
+  cameraStrafeVector.crossVectors(cameraForwardVector, cameraWorldUp)
+  if (cameraStrafeVector.lengthSq() > 1e-6)
+    cameraStrafeVector.normalize()
+  else
+    cameraStrafeVector.set(1, 0, 0)
+
+  if (forward)
+    cameraMoveVector.add(cameraForwardVector)
+  if (backward)
+    cameraMoveVector.addScaledVector(cameraForwardVector, -1)
+  if (right)
+    cameraMoveVector.add(cameraStrafeVector)
+  if (left)
+    cameraMoveVector.addScaledVector(cameraStrafeVector, -1)
+  if (up)
+    cameraMoveVector.add(cameraWorldUp)
+  if (down)
+    cameraMoveVector.addScaledVector(cameraWorldUp, -1)
+
+  if (cameraMoveVector.lengthSq() === 0)
+    return
+
+  cameraMoveVector.normalize()
+  const travelSpeed = (boost ? baseCameraMoveSpeed * cameraBoostMultiplier : baseCameraMoveSpeed) * delta
+  cameraMoveVector.multiplyScalar(travelSpeed)
+  cameraPivot.position.add(cameraMoveVector)
+  cameraPivot.position.y = THREE.MathUtils.clamp(cameraPivot.position.y, 0.5, 120)
+  updateCameraPosition()
+}
+
 const clock = new THREE.Clock()
 
 const animate = () => {
   const delta = clock.getDelta()
   updateMovement(delta)
+  updateCameraMovement(delta)
   renderer.render(scene, camera)
 }
 
