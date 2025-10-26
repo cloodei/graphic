@@ -46,6 +46,17 @@ export const SETTINGS = {
     deceleration: 22,
     maxForwardSpeed: 10,
     maxReverseSpeed: 4,
-    turnSpeed: Math.PI * 0.85
+    turnSpeed: Math.PI * 0.85,
+
+    headlights: {
+      color: 0xfff8d4,
+      intensity: 100,
+      distance: 180,
+      angle: Math.PI / 6,
+      penumbra: 0.15,
+      decay: 1,
+      emissiveIntensity: 6.4,
+      offsetZ: 0.6
+    }
   }
 } as const

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import type { BuildingConfig } from '../types'
 import { SETTINGS } from '../config'
+import type { BuildingConfig } from '../types'
 
 const foundationMaterial = new THREE.MeshStandardMaterial({
   color: SETTINGS.city.building.foundationColor,

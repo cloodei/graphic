@@ -1,4 +1,7 @@
 import * as THREE from 'three'
+import { SETTINGS } from '../config'
+
+const { headlights: HEADLIGHTS } = SETTINGS.vehicle
 
 export const carGroup = new THREE.Group()
 
@@ -88,12 +91,12 @@ const headlightMaterial = new THREE.MeshStandardMaterial({
 
 const headlightLeft = new THREE.Mesh(headlightGeometry, headlightMaterial.clone())
 headlightLeft.rotation.z = Math.PI / 2
-headlightLeft.position.set(2.7, 1, 0.6)
+headlightLeft.position.set(2.7, 1, HEADLIGHTS.offsetZ)
 carGroup.add(headlightLeft)
 
 const headlightRight = new THREE.Mesh(headlightGeometry, headlightMaterial.clone())
 headlightRight.rotation.z = Math.PI / 2
-headlightRight.position.set(2.7, 1, -0.6)
+headlightRight.position.set(2.7, 1, -HEADLIGHTS.offsetZ)
 carGroup.add(headlightRight)
 
 const taillightMaterial = new THREE.MeshStandardMaterial({
@@ -141,13 +144,20 @@ addWheel(-1.6, 1)
 addWheel(-1.6, -1)
 
 const createHeadlightSpot = (offsetZ: number) => {
-  const light = new THREE.SpotLight(0xfff8d4, 0, 170, Math.PI / 6.5, 0.15, 1)
+  const light = new THREE.SpotLight(
+    HEADLIGHTS.color,
+    HEADLIGHTS.intensity,
+    HEADLIGHTS.distance,
+    HEADLIGHTS.angle,
+    HEADLIGHTS.penumbra,
+    HEADLIGHTS.decay
+  )
   light.position.set(2.6, 1.05, offsetZ)
   light.target.position.set(40, 0.3, offsetZ * 0.8)
   light.castShadow = true
   light.shadow.mapSize.set(1024, 1024)
   light.shadow.camera.near = 0.5
-  light.shadow.camera.far = 160
+  light.shadow.camera.far = 240
   light.shadow.bias = -0.0001
 
   carGroup.add(light)
@@ -156,7 +166,7 @@ const createHeadlightSpot = (offsetZ: number) => {
   return light
 }
 
-const headlightSpots = [createHeadlightSpot(0.6), createHeadlightSpot(-0.6)]
+const headlightSpots = [createHeadlightSpot(HEADLIGHTS.offsetZ), createHeadlightSpot(-HEADLIGHTS.offsetZ)]
 const headlightMeshes = [headlightLeft, headlightRight]
 
 const cabinGlow = new THREE.PointLight(0x4d6eff, 1.3, 6, 1.8)
@@ -171,14 +181,11 @@ carGroup.add(carDetailLight)
 carGroup.add(carDetailLight.target)
 
 export const setCarHeadlights = (on: boolean) => {
-  const intensity = on ? 48 : 0
-  headlightSpots.forEach(light => {
-    light.intensity = intensity
-  })
-  headlightMeshes.forEach(mesh => {
-    const material = mesh.material as THREE.MeshStandardMaterial
-    material.emissiveIntensity = on ? 6.4 : 0.2
-  })
+  const intensity = on ? HEADLIGHTS.intensity : 0
+  const emissiveIntensity = on ? HEADLIGHTS.emissiveIntensity : 0
+
+  headlightSpots.forEach(light => light.intensity = intensity)
+  headlightMeshes.forEach(mesh => mesh.material.emissiveIntensity = emissiveIntensity)
 }
 
 setCarHeadlights(true)
