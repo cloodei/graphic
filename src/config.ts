@@ -1,12 +1,12 @@
 export const SETTINGS = {
   world: {
-    bounds: 140,
-    groundSize: 220,
+    bounds: 480,
+    groundSize: 480,
     groundColor: 0x1e222b as const,
     fogColor: 0x000000 as const
   },
   city: {
-    gridRadius: 6,
+    gridRadius: 18,
     spacing: 24,
     building: {
       widthRange: [7.5, 11.5] as const,

@@ -1,7 +1,8 @@
 import * as THREE from 'three'
+// import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { SETTINGS } from './config'
 import { carGroup, setCarHeadlights } from './models/car'
 import { buildingGroups, buildingBoxes } from './models/buildings'
-import { SETTINGS } from './config'
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(SETTINGS.world.fogColor)
@@ -123,8 +124,10 @@ let globalLightOn = false
 
 const setGlobalLight = (on: boolean) => {
   globalLightOn = on
-  const targetAmbient = on ? 0.6 : 0
-  const targetDirectional = on ? 1.1 : 0
+
+  const targetAmbient = on ? 1.6 : 0
+  const targetDirectional = on ? 2.4 : 0
+
   globalAmbient.intensity = targetAmbient
   globalDirectional.intensity = targetDirectional
 }
@@ -189,7 +192,7 @@ const handleMovementKey = (key: string, value: boolean) => {
   }
 }
 
-window.addEventListener('keydown', (event: KeyboardEvent) => {
+window.addEventListener('keydown', (event) => {
   const key = event.key.toLowerCase()
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key))
     event.preventDefault()
@@ -213,7 +216,7 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
   handleMovementKey(key, true)
 })
 
-window.addEventListener('keyup', (event: KeyboardEvent) => {
+window.addEventListener('keyup', (event) => {
   const key = event.key.toLowerCase()
   if (handleCameraMoveKey(key, false))
     return
@@ -221,7 +224,7 @@ window.addEventListener('keyup', (event: KeyboardEvent) => {
   handleMovementKey(key, false)
 })
 
-const moveParams = { ...SETTINGS.vehicle }
+const { vehicle: moveParams } = SETTINGS
 
 const forwardVector = new THREE.Vector3()
 const moveDelta = new THREE.Vector3()

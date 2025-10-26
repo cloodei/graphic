@@ -48,9 +48,11 @@ const createBuildingGroup = ({ x, z, width, depth, height }: BuildingConfig) => 
 }
 
 const generateCityLayout = () => {
-  const configs: BuildingConfig[] = []
   const { gridRadius, spacing, building } = SETTINGS.city
+  const n = (gridRadius << 1) + 1
+  const configs: BuildingConfig[] = new Array(n * n - 1)
 
+  let i = 0
   for (let gx = -gridRadius; gx <= gridRadius; gx++) {
     for (let gz = -gridRadius; gz <= gridRadius; gz++) {
       if (gx === 0 && gz === 0)
@@ -58,14 +60,14 @@ const generateCityLayout = () => {
 
       const jitterX = THREE.MathUtils.randFloatSpread(building.jitter)
       const jitterZ = THREE.MathUtils.randFloatSpread(building.jitter)
-      const centerX = gx * spacing + jitterX
-      const centerZ = gz * spacing + jitterZ
+      const x = gx * spacing + jitterX
+      const z = gz * spacing + jitterZ
 
       const width = THREE.MathUtils.randFloat(...building.widthRange)
       const depth = THREE.MathUtils.randFloat(...building.depthRange)
       const height = THREE.MathUtils.randFloat(...building.heightRange)
 
-      configs.push({ x: centerX, z: centerZ, width, depth, height })
+      configs[i++] = { x, z, width, depth, height }
     }
   }
 

@@ -89,12 +89,12 @@ const headlightMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.18
 })
 
-const headlightLeft = new THREE.Mesh(headlightGeometry, headlightMaterial.clone())
+const headlightLeft = new THREE.Mesh(headlightGeometry, headlightMaterial)
 headlightLeft.rotation.z = Math.PI / 2
 headlightLeft.position.set(2.7, 1, HEADLIGHTS.offsetZ)
 carGroup.add(headlightLeft)
 
-const headlightRight = new THREE.Mesh(headlightGeometry, headlightMaterial.clone())
+const headlightRight = new THREE.Mesh(headlightGeometry, headlightMaterial)
 headlightRight.rotation.z = Math.PI / 2
 headlightRight.position.set(2.7, 1, -HEADLIGHTS.offsetZ)
 carGroup.add(headlightRight)
@@ -110,7 +110,7 @@ const taillightLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.5), taill
 taillightLeft.position.set(-2.85, 1.05, 0.55)
 carGroup.add(taillightLeft)
 
-const taillightRight = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.5), taillightMaterial.clone())
+const taillightRight = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.5), taillightMaterial)
 taillightRight.position.set(-2.85, 1.05, -0.55)
 carGroup.add(taillightRight)
 
