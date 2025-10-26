@@ -28,7 +28,7 @@ const createAsphaltTexture = () => {
   ctx.fillStyle = '#0b0d11'
   ctx.fillRect(0, 0, size, size)
 
-  for (let i = 0; i < 2200; i += 1) {
+  for (let i = 0; i < 2200; i++) {
     const value = 20 + Math.random() * 40
     ctx.fillStyle = `rgba(${value}, ${value + 5}, ${value + 10}, ${0.25 + Math.random() * 0.2})`
     const x = Math.random() * size
@@ -53,7 +53,7 @@ const createRoadTexture = () => {
 
   ctx.strokeStyle = '#272a30'
   ctx.lineWidth = 2
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < 60; i++) {
     const offset = Math.random() * 256
     ctx.beginPath()
     ctx.moveTo(0, offset)
@@ -123,8 +123,8 @@ const createFacadeTexture = (base: string, windows: string) => {
   const cellW = (256 - paddingX * 2) / columns
   const cellH = (256 - paddingY * 2) / rows
 
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < columns; x += 1) {
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < columns; x++) {
       const flicker = 0.55 + Math.random() * 0.35
       ctx.fillStyle = windows
       ctx.globalAlpha = flicker
