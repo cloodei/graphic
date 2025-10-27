@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-// import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { SETTINGS } from './config'
 import { carGroup, setCarHeadlights } from './models/car'
 import { buildingGroups, buildingBoxes } from './models/buildings'
@@ -25,27 +25,26 @@ const camera = new THREE.PerspectiveCamera(
   SETTINGS.camera.clipping.near,
   SETTINGS.camera.clipping.far
 )
-cameraPivot.add(camera)
+scene.add(camera)
 
-const spherical = new THREE.Spherical(
-  SETTINGS.camera.spherical.radius,
-  SETTINGS.camera.spherical.phi,
-  SETTINGS.camera.spherical.theta
-)
-const updateCameraPosition = () => {
-  const sinPhiRadius = Math.sin(spherical.phi) * spherical.radius
-  camera.position.set(
-    sinPhiRadius * Math.sin(spherical.theta),
-    Math.cos(spherical.phi) * spherical.radius,
-    sinPhiRadius * Math.cos(spherical.theta)
-  )
-  camera.lookAt(cameraPivot.position)
-  camera.updateProjectionMatrix()
+camera.position.set(8, 2.5, 8)
+camera.lookAt(cameraPivot.position)
+
+const controls = new OrbitControls(camera, renderer.domElement)
+controls.enableDamping = true
+controls.dampingFactor = 0.08
+controls.enablePan = false
+controls.minDistance = 15
+controls.maxDistance = 140
+controls.minPolarAngle = 0.2
+controls.maxPolarAngle = Math.PI / 2 - 0.1
+
+const syncControlsTarget = () => {
+  controls.target.copy(cameraPivot.position)
 }
-updateCameraPosition()
+syncControlsTarget()
+controls.update()
 
-let isDragging = false
-const lastPointer = new THREE.Vector2()
 const cameraMoveState = {
   forward: false,
   backward: false,
@@ -60,39 +59,10 @@ const cameraMoveVector = new THREE.Vector3()
 const cameraForwardVector = new THREE.Vector3()
 const cameraStrafeVector = new THREE.Vector3()
 const cameraWorldUp = new THREE.Vector3(0, 1, 0)
+const previousCameraPivot = new THREE.Vector3()
 
 const baseCameraMoveSpeed = SETTINGS.camera.move.baseSpeed
 const cameraBoostMultiplier = SETTINGS.camera.move.boostMultiplier
-
-window.addEventListener('mousedown', (event) => {
-  isDragging = true
-  lastPointer.set(event.clientX, event.clientY)
-})
-window.addEventListener('mouseup', () => isDragging = false)
-window.addEventListener('mouseleave', () => isDragging = false)
-window.addEventListener('mousemove', (event) => {
-  if (!isDragging)
-    return
-
-  const deltaX = event.clientX - lastPointer.x
-  const deltaY = event.clientY - lastPointer.y
-  lastPointer.set(event.clientX, event.clientY)
-  spherical.theta -= deltaX * SETTINGS.camera.rotationSpeed
-  spherical.phi = THREE.MathUtils.clamp(
-    spherical.phi - deltaY * SETTINGS.camera.rotationSpeed,
-    0.2,
-    Math.PI / 2 - 0.1
-  )
-  updateCameraPosition()
-})
-window.addEventListener('wheel', (event) => {
-  spherical.radius = THREE.MathUtils.clamp(
-    spherical.radius + event.deltaY * SETTINGS.camera.zoomStep,
-    15,
-    140
-  )
-  updateCameraPosition()
-})
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(SETTINGS.world.groundSize, SETTINGS.world.groundSize, 1, 1),
@@ -123,10 +93,8 @@ scene.add(globalDirectional)
 let globalLightOn = false
 
 const setGlobalLight = (on: boolean) => {
-  globalLightOn = on
-
-  const targetAmbient = on ? 1.6 : 0
-  const targetDirectional = on ? 2.4 : 0
+  const targetAmbient = (globalLightOn = on) ? 2.2 : 0
+  const targetDirectional = on ? 3.0 : 0
 
   globalAmbient.intensity = targetAmbient
   globalDirectional.intensity = targetDirectional
@@ -134,7 +102,92 @@ const setGlobalLight = (on: boolean) => {
 
 setGlobalLight(globalLightOn)
 
-buildingGroups.forEach((group: THREE.Group) => scene.add(group))
+buildingGroups.forEach(group => scene.add(group))
+
+const fenceMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.85, metalness: 0.1 })
+const fenceTempDirection = new THREE.Vector3()
+const fenceMidpoint = new THREE.Vector3()
+const fenceHeight = 4
+const fenceThickness = 1
+const minFenceDistance = 6
+const maxFenceDistance = SETTINGS.city.spacing * 1.8
+const desiredFenceCount = 18
+
+const createFenceBetween = (groupA: THREE.Group, groupB: THREE.Group) => {
+  fenceTempDirection.subVectors(groupB.position, groupA.position)
+  const fenceLength = fenceTempDirection.length()
+  if (fenceLength <= minFenceDistance)
+    return false
+
+  const fenceGeometry = new THREE.BoxGeometry(fenceLength, fenceHeight, fenceThickness)
+  const fence = new THREE.Mesh(fenceGeometry, fenceMaterial)
+  fence.castShadow = true
+  fence.receiveShadow = true
+
+  fenceMidpoint.addVectors(groupA.position, groupB.position).multiplyScalar(0.5)
+  fence.position.set(fenceMidpoint.x, fenceHeight / 2, fenceMidpoint.z)
+  fence.rotation.y = Math.atan2(fenceTempDirection.z, fenceTempDirection.x)
+
+  scene.add(fence)
+  fence.updateMatrixWorld(true)
+  buildingBoxes.push(new THREE.Box3().setFromObject(fence))
+  return true
+}
+
+if (buildingGroups.length >= 2) {
+  const usedPairs = new Set<string>()
+  let fencesCreated = 0
+  const attempts = buildingGroups.length * 12
+
+  for (let attempt = 0; attempt < attempts && fencesCreated < desiredFenceCount; attempt++) {
+    const indexA = Math.floor(Math.random() * buildingGroups.length)
+    let indexB = Math.floor(Math.random() * buildingGroups.length)
+
+    if (buildingGroups.length === 1)
+      break
+
+    while (indexB === indexA)
+      indexB = Math.floor(Math.random() * buildingGroups.length)
+
+    const key = indexA < indexB ? `${indexA}-${indexB}` : `${indexB}-${indexA}`
+    if (usedPairs.has(key))
+      continue
+
+    const groupA = buildingGroups[indexA]
+    const groupB = buildingGroups[indexB]
+    const distance = groupA.position.distanceTo(groupB.position)
+    if (distance < minFenceDistance || distance > maxFenceDistance)
+      continue
+
+    if (createFenceBetween(groupA, groupB)) {
+      usedPairs.add(key)
+      fencesCreated++
+    }
+  }
+
+  if (!usedPairs.size) {
+    let bestA: THREE.Group | null = null
+    let bestB: THREE.Group | null = null
+    let bestDistance = Infinity
+
+    for (let i = 0; i < buildingGroups.length - 1; i++) {
+      for (let j = i + 1; j < buildingGroups.length; j++) {
+        const distance = buildingGroups[i].position.distanceTo(buildingGroups[j].position)
+        if (distance <= minFenceDistance)
+          continue
+
+        if (distance < bestDistance) {
+          bestDistance = distance
+          bestA = buildingGroups[i]
+          bestB = buildingGroups[j]
+        }
+      }
+    }
+
+    if (bestA && bestB)
+      createFenceBetween(bestA, bestB)
+  }
+}
 
 const controlsState = {
   forward: false,
@@ -179,16 +232,16 @@ const handleMovementKey = (key: string, value: boolean) => {
   switch (key) {
     case 'w':
       controlsState.forward = value
-      break;
+      return
     case 's':
       controlsState.backward = value
-      break;
+      return
     case 'a':
       controlsState.left = value
-      break;
+      return
     case 'd':
       controlsState.right = value
-      break;
+      return
   }
 }
 
@@ -202,11 +255,6 @@ window.addEventListener('keydown', (event) => {
 
   if (key === 'h') {
     setHeadlights(!headlightsOn)
-    return
-  }
-  if (key === 'c') {
-    cameraPivot.position.copy(carGroup.position)
-    updateCameraPosition()
     return
   }
   if (key === 'g') {
@@ -350,16 +398,20 @@ const updateCameraMovement = (delta: number) => {
     return
 
   cameraMoveVector.normalize()
+
   const travelSpeed = (boost ? baseCameraMoveSpeed * cameraBoostMultiplier : baseCameraMoveSpeed) * delta
   cameraMoveVector.multiplyScalar(travelSpeed)
+
+  previousCameraPivot.copy(cameraPivot.position)
   cameraPivot.position.add(cameraMoveVector)
   cameraPivot.position.y = THREE.MathUtils.clamp(
     cameraPivot.position.y,
     SETTINGS.camera.move.heightClamp.min,
     SETTINGS.camera.move.heightClamp.max
   )
-
-  updateCameraPosition()
+  cameraMoveVector.copy(cameraPivot.position).sub(previousCameraPivot)
+  camera.position.add(cameraMoveVector)
+  syncControlsTarget()
 }
 
 const clock = new THREE.Clock()
@@ -368,6 +420,7 @@ const animate = () => {
   const delta = clock.getDelta()
   updateMovement(delta)
   updateCameraMovement(delta)
+  controls.update()
   renderer.render(scene, camera)
 }
 
@@ -377,5 +430,5 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
-  updateCameraPosition()
+  controls.update()
 })

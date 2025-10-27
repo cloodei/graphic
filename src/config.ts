@@ -9,9 +9,9 @@ export const SETTINGS = {
     gridRadius: 18,
     spacing: 24,
     building: {
-      widthRange: [7.5, 11.5] as const,
-      depthRange: [7.5, 11.5] as const,
-      heightRange: [10, 18] as const,
+      widthRange: [7.5, 13.5] as const,
+      depthRange: [7.5, 13.5] as const,
+      heightRange: [8, 20] as const,
       baseHeight: 0.5,
       bodyColor: 0x343b48 as const,
       roofColor: 0x252b35 as const,
