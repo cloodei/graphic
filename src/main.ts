@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { SETTINGS } from './config'
+import { createFences } from './models/fences'
 import { carGroup, setCarHeadlights } from './models/car'
 import { buildingGroups, buildingBoxes } from './models/buildings'
 
@@ -103,91 +104,7 @@ const setGlobalLight = (on: boolean) => {
 setGlobalLight(globalLightOn)
 
 buildingGroups.forEach(group => scene.add(group))
-
-const fenceMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.85, metalness: 0.1 })
-const fenceTempDirection = new THREE.Vector3()
-const fenceMidpoint = new THREE.Vector3()
-const fenceHeight = 4
-const fenceThickness = 1
-const minFenceDistance = 6
-const maxFenceDistance = SETTINGS.city.spacing * 1.8
-const desiredFenceCount = 18
-
-const createFenceBetween = (groupA: THREE.Group, groupB: THREE.Group) => {
-  fenceTempDirection.subVectors(groupB.position, groupA.position)
-  const fenceLength = fenceTempDirection.length()
-  if (fenceLength <= minFenceDistance)
-    return false
-
-  const fenceGeometry = new THREE.BoxGeometry(fenceLength, fenceHeight, fenceThickness)
-  const fence = new THREE.Mesh(fenceGeometry, fenceMaterial)
-  fence.castShadow = true
-  fence.receiveShadow = true
-
-  fenceMidpoint.addVectors(groupA.position, groupB.position).multiplyScalar(0.5)
-  fence.position.set(fenceMidpoint.x, fenceHeight / 2, fenceMidpoint.z)
-  fence.rotation.y = Math.atan2(fenceTempDirection.z, fenceTempDirection.x)
-
-  scene.add(fence)
-  fence.updateMatrixWorld(true)
-  buildingBoxes.push(new THREE.Box3().setFromObject(fence))
-  return true
-}
-
-if (buildingGroups.length >= 2) {
-  const usedPairs = new Set<string>()
-  let fencesCreated = 0
-  const attempts = buildingGroups.length * 12
-
-  for (let attempt = 0; attempt < attempts && fencesCreated < desiredFenceCount; attempt++) {
-    const indexA = Math.floor(Math.random() * buildingGroups.length)
-    let indexB = Math.floor(Math.random() * buildingGroups.length)
-
-    if (buildingGroups.length === 1)
-      break
-
-    while (indexB === indexA)
-      indexB = Math.floor(Math.random() * buildingGroups.length)
-
-    const key = indexA < indexB ? `${indexA}-${indexB}` : `${indexB}-${indexA}`
-    if (usedPairs.has(key))
-      continue
-
-    const groupA = buildingGroups[indexA]
-    const groupB = buildingGroups[indexB]
-    const distance = groupA.position.distanceTo(groupB.position)
-    if (distance < minFenceDistance || distance > maxFenceDistance)
-      continue
-
-    if (createFenceBetween(groupA, groupB)) {
-      usedPairs.add(key)
-      fencesCreated++
-    }
-  }
-
-  if (!usedPairs.size) {
-    let bestA: THREE.Group | null = null
-    let bestB: THREE.Group | null = null
-    let bestDistance = Infinity
-
-    for (let i = 0; i < buildingGroups.length - 1; i++) {
-      for (let j = i + 1; j < buildingGroups.length; j++) {
-        const distance = buildingGroups[i].position.distanceTo(buildingGroups[j].position)
-        if (distance <= minFenceDistance)
-          continue
-
-        if (distance < bestDistance) {
-          bestDistance = distance
-          bestA = buildingGroups[i]
-          bestB = buildingGroups[j]
-        }
-      }
-    }
-
-    if (bestA && bestB)
-      createFenceBetween(bestA, bestB)
-  }
-}
+createFences(scene, buildingGroups, buildingBoxes)
 
 const controlsState = {
   forward: false,

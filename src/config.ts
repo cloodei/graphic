@@ -2,21 +2,33 @@ export const SETTINGS = {
   world: {
     bounds: 480,
     groundSize: 480,
-    groundColor: 0x1e222b as const,
-    fogColor: 0x000000 as const
+    groundColor: 0x1e222b,
+    fogColor: 0x000000
   },
   city: {
-    gridRadius: 18,
+    gridRadius: 16,
     spacing: 24,
     building: {
-      widthRange: [7.5, 13.5] as const,
-      depthRange: [7.5, 13.5] as const,
-      heightRange: [8, 20] as const,
+      widthRange: [7.5, 13.5],
+      depthRange: [7.5, 13.5],
+      heightRange: [8, 20],
       baseHeight: 0.5,
-      bodyColor: 0x343b48 as const,
-      roofColor: 0x252b35 as const,
-      foundationColor: 0x181d25 as const,
+      bodyColor: 0x343b48,
+      roofColor: 0x252b35,
+      foundationColor: 0x181d25,
       jitter: 1.5
+    },
+
+    fence: {
+      color: 0x4a5568,
+      roughness: 0.85,
+      metalness: 0.1,
+      height: 4,
+      thickness: 1,
+      minDistance: 6,
+      maxDistanceFactor: 1.8,
+      desiredCount: 18,
+      attemptsMultiplier: 12
     }
   },
   camera: {
