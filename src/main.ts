@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { Reflector } from 'three/examples/jsm/Addons.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { SETTINGS } from './config'
 import { createFences } from './models/fences'
@@ -7,7 +8,6 @@ import { buildingGroups, buildingBoxes } from './models/buildings'
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(SETTINGS.world.fogColor)
-scene.fog = new THREE.FogExp2(SETTINGS.world.fogColor, 0.022)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setPixelRatio(window.devicePixelRatio)
@@ -67,15 +67,41 @@ const cameraBoostMultiplier = SETTINGS.camera.move.boostMultiplier
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(SETTINGS.world.groundSize, SETTINGS.world.groundSize, 1, 1),
-  new THREE.MeshStandardMaterial({ color: SETTINGS.world.groundColor, roughness: 0.96, metalness: 0.04 })
+  new THREE.MeshStandardMaterial({
+    color: SETTINGS.world.groundColor,
+    roughness: 0.96,
+    metalness: 0.04
+  })
 )
 ground.rotation.x = -Math.PI / 2
 ground.receiveShadow = true
 scene.add(ground)
 
+const mirrorWidth = 360
+const mirrorHeight = 25
+const mirrorDistance = 25
+const mirrorGeometry = new THREE.PlaneGeometry(mirrorWidth, mirrorHeight)
+
+const mirrorOptions = {
+  clipBias: 0.003,
+  textureWidth: window.innerWidth,
+  textureHeight: window.innerHeight,
+  color: 0x444444
+}
+
+const mirrorFront = new Reflector(mirrorGeometry, mirrorOptions)
+mirrorFront.position.x = mirrorDistance - 0.05
+mirrorFront.rotation.y = -Math.PI / 2
+scene.add(mirrorFront)
+
+const mirrorBack = new Reflector(mirrorGeometry, mirrorOptions)
+mirrorBack.position.x = mirrorDistance + 0.05
+mirrorBack.rotation.y = Math.PI / 2
+scene.add(mirrorBack)
+
 scene.add(carGroup)
 
-let headlightsOn = true
+let headlightsOn = false
 
 const setHeadlights = (on: boolean) => {
   setCarHeadlights(on)
@@ -105,6 +131,7 @@ setGlobalLight(globalLightOn)
 
 buildingGroups.forEach(group => scene.add(group))
 createFences(scene, buildingGroups, buildingBoxes)
+
 
 const controlsState = {
   forward: false,

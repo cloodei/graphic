@@ -169,9 +169,9 @@ const createHeadlightSpot = (offsetZ: number) => {
 const headlightSpots = [createHeadlightSpot(HEADLIGHTS.offsetZ), createHeadlightSpot(-HEADLIGHTS.offsetZ)]
 const headlightMeshes = [headlightLeft, headlightRight]
 
-const cabinGlow = new THREE.PointLight(0x4d6eff, 1.3, 6, 1.8)
-cabinGlow.position.set(-0.4, 1.8, 0)
-carGroup.add(cabinGlow)
+// const cabinGlow = new THREE.PointLight(0x4d6eff, 1.3, 6, 1.8)
+// cabinGlow.position.set(-0.4, 1.8, 0)
+// carGroup.add(cabinGlow)
 
 const carDetailLight = new THREE.SpotLight(0x6a8cff, 0.85, 8, Math.PI / 3, 0.65, 1.4)
 carDetailLight.position.set(0, 2.4, 0)
@@ -187,5 +187,3 @@ export const setCarHeadlights = (on: boolean) => {
   headlightSpots.forEach(light => light.intensity = intensity)
   headlightMeshes.forEach(mesh => mesh.material.emissiveIntensity = emissiveIntensity)
 }
-
-setCarHeadlights(true)

@@ -2,6 +2,9 @@ import * as THREE from 'three'
 import { SETTINGS } from '../config'
 import type { BuildingConfig } from '../types'
 
+const textureLoader = new THREE.TextureLoader()
+const bodyTexture = textureLoader.load("/skyscraper.jpg")
+
 const foundationMaterial = new THREE.MeshStandardMaterial({
   color: SETTINGS.city.building.foundationColor,
   roughness: 0.95,
@@ -9,7 +12,7 @@ const foundationMaterial = new THREE.MeshStandardMaterial({
 })
 
 const bodyMaterial = new THREE.MeshStandardMaterial({
-  color: SETTINGS.city.building.bodyColor,
+  map: bodyTexture,
   roughness: 0.85,
   metalness: 0.08
 })

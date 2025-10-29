@@ -1,7 +1,7 @@
 export const SETTINGS = {
   world: {
-    bounds: 480,
-    groundSize: 480,
+    bounds: 600,
+    groundSize: 600,
     groundColor: 0x1e222b,
     fogColor: 0x000000
   },
@@ -27,7 +27,7 @@ export const SETTINGS = {
       thickness: 1,
       minDistance: 6,
       maxDistanceFactor: 1.8,
-      desiredCount: 18,
+      desiredCount: 60,
       attemptsMultiplier: 12
     }
   },
@@ -36,11 +36,6 @@ export const SETTINGS = {
     clipping: {
       near: 0.1,
       far: 400
-    },
-    spherical: {
-      radius: 42,
-      phi: Math.PI / 3.1,
-      theta: Math.PI / 4
     },
     rotationSpeed: 0.006,
     zoomStep: 0.012,
@@ -56,15 +51,15 @@ export const SETTINGS = {
   vehicle: {
     acceleration: 16,
     deceleration: 22,
-    maxForwardSpeed: 10,
-    maxReverseSpeed: 4,
+    maxForwardSpeed: 15,
+    maxReverseSpeed: 7,
     turnSpeed: Math.PI * 0.85,
 
     headlights: {
       color: 0xfff8d4,
-      intensity: 100,
-      distance: 180,
-      angle: Math.PI / 6,
+      intensity: 120,
+      distance: 200,
+      angle: Math.PI / 5,
       penumbra: 0.15,
       decay: 1,
       emissiveIntensity: 6.4,
